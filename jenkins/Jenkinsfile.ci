@@ -5,6 +5,11 @@
 pipeline {
     agent any
 
+    tools {
+        nodejs 'node20'
+    }
+
+
     environment {
         REPO_URL   = 'https://github.com/darshak0804/msdocs-nodejs-mongodb-azure-sample-app.git'
         REPO_REF   = 'main'
