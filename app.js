@@ -45,6 +45,7 @@ async function getApp() {
     express.static(__dirname + "/node_modules/bootstrap/dist/css")
   ); // redirect CSS bootstrap
 
+  app.get("/healthz", (req, res) => res.status(200).send("OK"));
   // catch 404 and forward to error handler
   app.use(function (req, res, next) {
     next(createError(404));
