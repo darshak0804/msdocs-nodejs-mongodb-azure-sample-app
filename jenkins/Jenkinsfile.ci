@@ -1,0 +1,81 @@
+// CI pipeline: clone -> install -> build -> test -> package -> publish artifact
+// Runs on any agent with Node.js available. Adjust the `tools`/`docker` block
+// to match how Node is provisioned on your Jenkins agents.
+
+pipeline {
+    agent any
+
+    environment {
+        REPO_URL   = 'https://github.com/darshak0804/msdocs-nodejs-mongodb-azure-sample-app.git'
+        REPO_REF   = 'main'
+        ARTIFACT   = "app-${env.BUILD_NUMBER}.zip"
+    }
+
+    options {
+        timestamps()
+        disableConcurrentBuilds()
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: "${REPO_REF}", url: "${REPO_URL}"
+            }
+        }
+
+        stage('Install dependencies') {
+            steps {
+                sh 'node --version && npm --version'
+                sh 'npm ci'
+            }
+        }
+
+        stage('Lint / Build') {
+            steps {
+                // The sample app has no bundling step, but this keeps the
+                // pipeline generic for apps that do (webpack, tsc, etc).
+                sh 'npm run build --if-present'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                // Fails the build if a real test script exists and fails.
+                // `--if-present` keeps this pipeline reusable even before
+                // tests are added to the sample app.
+                sh 'npm test --if-present'
+            }
+        }
+
+        stage('Package') {
+            steps {
+                sh '''
+                    rm -rf dist "${ARTIFACT}"
+                    mkdir dist
+                    rsync -a --exclude 'dist' --exclude '.git' --exclude 'node_modules/.cache' ./ dist/
+                    cd dist && zip -r "../${ARTIFACT}" . -x "*.git*"
+                '''
+            }
+        }
+
+        stage('Publish artifact') {
+            steps {
+                archiveArtifacts artifacts: "${ARTIFACT}", fingerprint: true
+                // Optional: also push to a shared location (Azure Blob
+                // Storage) so the CD job doesn't depend on Jenkins' own
+                // artifact store. Requires the Azure CLI on the agent and
+                // an 'azure-blob-sas-url' credential.
+                // sh "az storage blob upload --file ${ARTIFACT} --container-name builds --name ${ARTIFACT} --account-name <storageaccount> --sas-token \$AZ_SAS_TOKEN"
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Build ${env.BUILD_NUMBER} packaged as ${ARTIFACT} and archived."
+        }
+        failure {
+            echo "CI pipeline failed at build ${env.BUILD_NUMBER}."
+        }
+    }
+}
