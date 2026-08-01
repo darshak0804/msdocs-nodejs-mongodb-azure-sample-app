@@ -120,7 +120,7 @@ resource "azurerm_linux_web_app" "main" {
 
   app_settings = {
     "DATABASE_NAME"                        = var.cosmos_db_name
-    "DATABASE_URL"                         = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.database_url.versionless_id})"
+    "AZURE_COSMOS_CONNECTIONSTRING"        = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.database_url.versionless_id})"
     "SCM_DO_BUILD_DURING_DEPLOYMENT"       = "false"
     "WEBSITE_NODE_DEFAULT_VERSION"         = "~20"
   }
