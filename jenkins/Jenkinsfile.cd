@@ -1,4 +1,4 @@
-// CD pipeline: pull the artifact published by the CI job, authenticate to
+    // CD pipeline: pull the artifact published by the CI job, authenticate to
 // Azure with a service principal, deploy to the App Service that Terraform
 // already provisioned, then verify the health endpoint.
 //
@@ -15,7 +15,7 @@ pipeline {
         string(name: 'CI_JOB_NAME', defaultValue: 'nodejs-mongodb-ci', description: 'Upstream CI job to pull the artifact from')
         string(name: 'CI_BUILD_NUMBER', defaultValue: '', description: 'Leave blank to use the latest successful CI build')
         string(name: 'RESOURCE_GROUP', defaultValue: 'rg-msdocs-node-mongo-dev', description: 'Resource group from terraform output')
-        string(name: 'WEBAPP_NAME', defaultValue: '', description: 'App Service name from terraform output (app_service_name)')
+        string(name: 'WEBAPP_NAME', defaultValue: 'app-msdocs-node-mongo-srg3t6', description: 'App Service name from terraform output (app_service_name)')
     }
 
     environment {
