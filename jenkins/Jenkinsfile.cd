@@ -62,26 +62,35 @@ pipeline {
 
 
         stage('Deploy to Azure App Service') {
-
     steps {
-
         sh '''
+        echo "Finding artifact..."
 
-        echo "Files after artifact download"
-        ls -lah
+        ARTIFACT=$(ls *.tar.gz | head -1)
 
-        ZIP_FILE=$(ls *.zip | head -1)
+        echo "Found artifact: $ARTIFACT"
 
-        echo "Deploying $ZIP_FILE"
+
+        echo "Extracting artifact..."
+
+        tar -xzf $ARTIFACT
+
+
+        echo "Creating deployment zip..."
+
+        zip -r deploy.zip . \
+        -x ".git/*" \
+        "jenkins/*"
+
+
+        echo "Deploying to Azure..."
 
         az webapp deploy \
         --resource-group rg-nodejs-mongo-dev \
         --name darshak-nodejs-mongo-web \
-        --src-path "$ZIP_FILE" \
+        --src-path deploy.zip \
         --type zip
-
         '''
-
     }
 }
 
