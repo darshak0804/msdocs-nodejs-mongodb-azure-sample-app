@@ -34,22 +34,21 @@ pipeline {
         }
 
 
-
         stage('Azure Login') {
     steps {
         withCredentials([
-            string(
+            file(
                 credentialsId: 'azure-sp-json',
-                variable: 'AZURE_CREDENTIALS'
+                variable: 'AZURE_FILE'
             )
         ]) {
 
             sh '''
-                echo "$AZURE_CREDENTIALS" > azure.json
+                echo "Logging into Azure"
 
-                CLIENT_ID=$(python3 -c "import json; print(json.load(open('azure.json'))['clientId'])")
-                CLIENT_SECRET=$(python3 -c "import json; print(json.load(open('azure.json'))['clientSecret'])")
-                TENANT_ID=$(python3 -c "import json; print(json.load(open('azure.json'))['tenantId'])")
+                CLIENT_ID=$(grep clientId $AZURE_FILE | cut -d '"' -f4)
+                CLIENT_SECRET=$(grep clientSecret $AZURE_FILE | cut -d '"' -f4)
+                TENANT_ID=$(grep tenantId $AZURE_FILE | cut -d '"' -f4)
 
                 az login \
                 --service-principal \
@@ -60,6 +59,7 @@ pipeline {
         }
     }
 }
+
 
 
 
