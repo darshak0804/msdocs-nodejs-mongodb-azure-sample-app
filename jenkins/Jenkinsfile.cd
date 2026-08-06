@@ -6,7 +6,7 @@ pipeline {
 
         RESOURCE_GROUP = "rg-nodejs-mongo-dev"
 
-        WEBAPP_NAME = "your-webapp-name"
+        WEBAPP_NAME = "darshak-nodejs-mongo-web"
 
         ARTIFACT = "app-${BUILD_NUMBER}.tar.gz"
 
