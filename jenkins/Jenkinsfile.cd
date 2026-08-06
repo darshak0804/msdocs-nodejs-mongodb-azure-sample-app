@@ -63,21 +63,23 @@ pipeline {
 
         stage('Deploy to Azure App Service') {
 
-            steps {
+    steps {
 
-                sh '''
+        sh '''
+        
+        ZIP_FILE=$(find . -name "*.zip" | head -1)
 
-                az webapp deploy \
-                --resource-group ${RESOURCE_GROUP} \
-                --name ${AZURE_WEBAPP_NAME} \
-                --src-path ${ARTIFACT} \
-                --type zip
+        echo "Deploying: $ZIP_FILE"
 
-                '''
+        az webapp deploy \
+        --resource-group rg-nodejs-mongo-dev \
+        --name darshak-nodejs-mongo-web \
+        --src-path "$ZIP_FILE" \
+        --type zip
 
-            }
-
-        }
+        '''
+    }
+}
 
 
 
