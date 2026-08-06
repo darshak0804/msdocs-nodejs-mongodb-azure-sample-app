@@ -54,15 +54,18 @@ pipeline {
             }
         }
 
-        stage('Package') {
+stage('Package') {
     steps {
         sh '''
-            rm -rf dist "${ARTIFACT}"
-            mkdir dist
-            cp -r . dist/
-            cd dist
-            rm -rf .git node_modules
-            zip -r "../${ARTIFACT}" .
+            rm -f "${ARTIFACT}"
+
+            zip -r "${ARTIFACT}" . \
+            -x ".git/*" \
+            -x "node_modules/*" \
+            -x "*.zip" \
+            -x "dist/*"
+
+            ls -lh "${ARTIFACT}"
         '''
     }
 }
