@@ -2,110 +2,156 @@ pipeline {
 
     agent any
 
+
     environment {
 
+        AZURE_WEBAPP_NAME = "darshak-nodejs-mongo-web"
         RESOURCE_GROUP = "rg-nodejs-mongo-dev"
+        ARTIFACT = "app-${BUILD_NUMBER}.zip"
 
-        WEBAPP_NAME = "darshak-nodejs-mongo-web"
+    }
 
-        ARTIFACT = "app-${BUILD_NUMBER}.tar.gz"
 
+    options {
+        timestamps()
+        disableConcurrentBuilds()
     }
 
 
     stages {
 
 
-       stage('Download Artifact') {
+        stage('Download Artifact') {
 
             steps {
 
                 copyArtifacts(
-                projectName: 'nodejs-mongodb-ci',
-                selector: lastSuccessful(),
-                filter: '*.tar.gz'
-            )
+                    projectName: 'nodejs-mongodb-ci',
+                    selector: specific("${BUILD_NUMBER}")
+                )
 
-        }   
-    }
-
-
-
-stage('Azure Login') {
-    steps {
-        withCredentials([
-            string(
-                credentialsId: 'azure-sp-json',
-                variable: 'AZURE_CREDENTIALS'
-            )
-        ]) {
-
-            sh '''
-            echo $AZURE_CREDENTIALS > azure.json
-
-            az login \
-            --service-principal \
-            -u $(cat azure.json | jq -r .clientId) \
-            -p $(cat azure.json | jq -r .clientSecret) \
-            --tenant $(cat azure.json | jq -r .tenantId)
-
-            az account set \
-            --subscription $(cat azure.json | jq -r .subscriptionId)
-            '''
+            }
         }
+
+
+
+        stage('Azure Login') {
+
+            steps {
+
+                withCredentials([
+                    string(
+                        credentialsId: 'azure-sp-json',
+                        variable: 'AZURE_CREDENTIALS'
+                    )
+                ]) {
+
+
+                    sh '''
+
+                    echo "$AZURE_CREDENTIALS" > azure.json
+
+
+                    az login \
+                    --service-principal \
+                    -u $(cat azure.json | jq -r .clientId) \
+                    -p $(cat azure.json | jq -r .clientSecret) \
+                    --tenant $(cat azure.json | jq -r .tenantId)
+
+
+                    az account set \
+                    --subscription $(cat azure.json | jq -r .subscriptionId)
+
+
+                    '''
+
+                }
+
+            }
+
+        }
+
+
+
+        stage('Deploy to Azure App Service') {
+
+            steps {
+
+                sh '''
+
+                az webapp deploy \
+                --resource-group ${RESOURCE_GROUP} \
+                --name ${AZURE_WEBAPP_NAME} \
+                --src-path ${ARTIFACT} \
+                --type zip
+
+                '''
+
+            }
+
+        }
+
+
+
+        stage('Restart App') {
+
+            steps {
+
+                sh '''
+
+                az webapp restart \
+                --resource-group ${RESOURCE_GROUP} \
+                --name ${AZURE_WEBAPP_NAME}
+
+                '''
+
+            }
+
+        }
+
+
+
+
+        stage('Health Check') {
+
+            steps {
+
+                sh '''
+
+                sleep 30
+
+
+                curl -I \
+                https://${AZURE_WEBAPP_NAME}.azurewebsites.net
+
+
+                '''
+
+            }
+
+        }
+
+
     }
-}
 
 
 
-stage('Deploy to Azure App Service') {
+    post {
 
-steps {
+        success {
 
-sh '''
-az webapp deploy \
---resource-group rg-nodejs-mongo-dev \
---name darshak-nodejs-mongo-web \
---src-path app-${BUILD_NUMBER}.zip \
---type zip
-'''
+            echo "Deployment completed successfully"
 
-}
-
-}
+        }
 
 
+        failure {
 
-stage('Restart App') {
+            echo "Deployment failed"
 
-steps {
+        }
 
-sh '''
+    }
 
-az webapp restart \
---resource-group rg-nodejs-mongo-dev \
---name darshak-nodejs-mongo-web
-
-'''
-
-}
-
-}
-
-
-
-stage('Health Check') {
-
-steps {
-
-sh '''
-
-sleep 30
-
-curl -I https://darshak-nodejs-mongo-web.azurewebsites.net
-
-'''
-
-}
 
 }
