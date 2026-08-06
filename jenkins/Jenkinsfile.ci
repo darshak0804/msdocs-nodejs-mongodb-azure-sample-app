@@ -15,7 +15,7 @@ pipeline {
     environment {
         REPO_URL   = 'https://github.com/darshak0804/msdocs-nodejs-mongodb-azure-sample-app.git'
         REPO_REF   = 'main'
-        ARTIFACT   = "app-${env.BUILD_NUMBER}.zip"
+        ARTIFACT="app-${env.BUILD_NUMBER}.tar.gz"
     }
 
     options {
@@ -54,18 +54,14 @@ pipeline {
             }
         }
 
-stage('Package') {
+        stage('Package') {
     steps {
         sh '''
-            rm -f "${ARTIFACT}"
-
-            zip -r "${ARTIFACT}" . \
-            -x ".git/*" \
-            -x "node_modules/*" \
-            -x "*.zip" \
-            -x "dist/*"
-
-            ls -lh "${ARTIFACT}"
+            rm -f ${ARTIFACT}
+            tar -czf ${ARTIFACT}.tar.gz \
+            --exclude=.git \
+            --exclude=node_modules \
+            --exclude=*.tar.gz .
         '''
     }
 }
