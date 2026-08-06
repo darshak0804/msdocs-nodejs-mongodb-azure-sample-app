@@ -1,106 +1,126 @@
-    // CD pipeline: pull the artifact published by the CI job, authenticate to
-// Azure with a service principal, deploy to the App Service that Terraform
-// already provisioned, then verify the health endpoint.
-//
-// Required Jenkins credentials (Manage Jenkins > Credentials):
-//   azure-sp-client-id      (Secret text)
-//   azure-sp-client-secret  (Secret text)
-//   azure-sp-tenant-id      (Secret text)
-//   azure-subscription-id   (Secret text)
-
 pipeline {
+
     agent any
 
-    parameters {
-        string(name: 'CI_JOB_NAME', defaultValue: 'nodejs-mongodb-ci', description: 'Upstream CI job to pull the artifact from')
-        string(name: 'CI_BUILD_NUMBER', defaultValue: '', description: 'Leave blank to use the latest successful CI build')
-        string(name: 'RESOURCE_GROUP', defaultValue: 'rg-msdocs-node-mongo-dev', description: 'Resource group from terraform output')
-        string(name: 'WEBAPP_NAME', defaultValue: 'app-msdocs-node-mongo-srg3t6', description: 'App Service name from terraform output (app_service_name)')
+    environment {
+
+        RESOURCE_GROUP = "rg-nodejs-mongo-dev"
+
+        WEBAPP_NAME = "your-webapp-name"
+
+        ARTIFACT = "app-${BUILD_NUMBER}.tar.gz"
+
     }
 
-    environment {
-        AZURE_CLIENT_ID       = credentials('azure-sp-client-id')
-        AZURE_CLIENT_SECRET   = credentials('azure-sp-client-secret')
-        AZURE_TENANT_ID       = credentials('azure-sp-tenant-id')
-        AZURE_SUBSCRIPTION_ID = credentials('azure-subscription-id')
-    }
 
     stages {
-        stage('Fetch build artifact') {
+
+
+        stage('Download Artifact') {
+
             steps {
-                script {
-                    def selector = params.CI_BUILD_NUMBER?.trim() ? params.CI_BUILD_NUMBER : 'lastSuccessful'
-                    copyArtifacts(
-                        projectName: params.CI_JOB_NAME,
-                        selector: selector == 'lastSuccessful' ? lastSuccessful() : specific(selector),
-                        filter: 'app-*.zip',
-                        flatten: true
+
+                copyArtifacts(
+                    projectName: 'nodejs-mongodb-ci',
+                    selector: specific("${BUILD_NUMBER}")
+                )
+
+            }
+
+        }
+
+
+
+        stage('Azure Login') {
+
+            steps {
+
+                withCredentials([
+                    azureServicePrincipal(
+                    credentialsId: 'azure-sp-nodejs-mongo',
+                    subscriptionIdVariable: 'AZURE_SUBSCRIPTION_ID',
+                    clientIdVariable: 'AZURE_CLIENT_ID',
+                    clientSecretVariable: 'AZURE_CLIENT_SECRET',
+                    tenantIdVariable: 'AZURE_TENANT_ID'
                     )
+                ]) {
+
+                    sh '''
+
+                    az login \
+                    --service-principal \
+                    -u $AZURE_CLIENT_ID \
+                    -p $AZURE_CLIENT_SECRET \
+                    --tenant $AZURE_TENANT_ID
+
+
+                    az account set \
+                    --subscription $AZURE_SUBSCRIPTION_ID
+
+
+                    '''
+
                 }
-                sh 'ls -la app-*.zip'
+
             }
+
         }
 
-        stage('Azure login') {
+
+
+        stage('Deploy to Azure App Service') {
+
             steps {
+
                 sh '''
-                    az login --service-principal \
-                        -u "$AZURE_CLIENT_ID" \
-                        -p "$AZURE_CLIENT_SECRET" \
-                        --tenant "$AZURE_TENANT_ID"
-                    az account set --subscription "$AZURE_SUBSCRIPTION_ID"
+
+                az webapp deploy \
+                --resource-group ${RESOURCE_GROUP} \
+                --name ${WEBAPP_NAME} \
+                --src-path ${ARTIFACT} \
+                --type zip
+
+
                 '''
+
             }
+
         }
 
-        stage('Deploy to App Service') {
+
+
+        stage('Restart App') {
+
             steps {
-                script {
-                    if (!params.WEBAPP_NAME?.trim()) {
-                        error("WEBAPP_NAME parameter is required (see terraform output app_service_name)")
-                    }
-                }
+
                 sh '''
-                    ARTIFACT=$(ls app-*.zip | head -n1)
-                    az webapp deploy \
-                        --resource-group "${RESOURCE_GROUP}" \
-                        --name "${WEBAPP_NAME}" \
-                        --src-path "$ARTIFACT" \
-                        --type zip
+
+                az webapp restart \
+                --resource-group ${RESOURCE_GROUP} \
+                --name ${WEBAPP_NAME}
+
                 '''
+
             }
+
         }
 
-        stage('Verify deployment health') {
+
+
+        stage('Health Check') {
+
             steps {
+
                 sh '''
-                    HEALTH_URL="https://${WEBAPP_NAME}.azurewebsites.net/healthz"
-                    echo "Checking $HEALTH_URL"
-                    for i in $(seq 1 10); do
-                        STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTH_URL" || true)
-                        if [ "$STATUS" = "200" ]; then
-                            echo "Health check passed (HTTP $STATUS)"
-                            exit 0
-                        fi
-                        echo "Attempt $i: HTTP $STATUS, retrying in 15s..."
-                        sleep 15
-                    done
-                    echo "Health check failed after 10 attempts"
-                    exit 1
+
+                curl https://${WEBAPP_NAME}.azurewebsites.net/healthz
+
                 '''
+
             }
+
         }
+
     }
 
-    post {
-        always {
-            sh 'az logout || true'
-        }
-        success {
-            echo "Deployed and verified: https://${WEBAPP_NAME}.azurewebsites.net"
-        }
-        failure {
-            echo "CD pipeline failed - check deployment logs and health endpoint."
-        }
-    }
 }
