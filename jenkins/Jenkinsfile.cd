@@ -34,21 +34,21 @@ pipeline {
         }
 
 
-        stage('Azure Login') {
+       stage('Azure Login') {
     steps {
         withCredentials([
-            file(credentialsId: 'azure-sp-json', variable: 'AZURE_JSON')
+            string(credentialsId: 'azure-sp-json', variable: 'AZURE_JSON')
         ]) {
 
             sh '''
-                echo "Logging into Azure..."
+            echo "$AZURE_JSON" > azure.json
 
-                az login --service-principal \
-                --username $(grep clientId $AZURE_JSON | awk -F '"' '{print $4}') \
-                --password $(grep clientSecret $AZURE_JSON | awk -F '"' '{print $4}') \
-                --tenant $(grep tenantId $AZURE_JSON | awk -F '"' '{print $4}')
+            az login --service-principal \
+            --username $(grep clientId azure.json | awk -F '"' '{print $4}') \
+            --password $(grep clientSecret azure.json | awk -F '"' '{print $4}') \
+            --tenant $(grep tenantId azure.json | awk -F '"' '{print $4}')
 
-                az account show
+            az account show
             '''
         }
     }
