@@ -66,10 +66,13 @@ pipeline {
     steps {
 
         sh '''
-        
-        ZIP_FILE=$(find . -name "*.zip" | head -1)
 
-        echo "Deploying: $ZIP_FILE"
+        echo "Files after artifact download"
+        ls -lah
+
+        ZIP_FILE=$(ls *.zip | head -1)
+
+        echo "Deploying $ZIP_FILE"
 
         az webapp deploy \
         --resource-group rg-nodejs-mongo-dev \
@@ -78,6 +81,7 @@ pipeline {
         --type zip
 
         '''
+
     }
 }
 
