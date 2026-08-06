@@ -38,7 +38,7 @@ pipeline {
         stage('Azure Login') {
     steps {
         withCredentials([
-            file(credentialsId: 'azure-sp', variable: 'AZURE_CREDENTIALS')
+            file(credentialsId: 'azure-sp-json', variable: 'AZURE_CREDENTIALS')
         ]) {
 
             sh '''
