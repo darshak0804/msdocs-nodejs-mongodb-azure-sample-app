@@ -47,28 +47,19 @@ pipeline {
         ]) {
 
             sh '''
-            
+
             echo "$AZURE_CREDENTIALS" > azure.json
-
-
-            CLIENT_ID=$(python3 -c "import json;print(json.load(open('azure.json'))['clientId'])")
-
-            CLIENT_SECRET=$(python3 -c "import json;print(json.load(open('azure.json'))['clientSecret'])")
-
-            TENANT_ID=$(python3 -c "import json;print(json.load(open('azure.json'))['tenantId'])")
-
-            SUBSCRIPTION_ID=$(python3 -c "import json;print(json.load(open('azure.json'))['subscriptionId'])")
 
 
             az login \
             --service-principal \
-            --username $CLIENT_ID \
-            --password $CLIENT_SECRET \
-            --tenant $TENANT_ID
+            --username $(grep clientId azure.json | awk -F'"' '{print $4}') \
+            --password $(grep clientSecret azure.json | awk -F'"' '{print $4}') \
+            --tenant $(grep tenantId azure.json | awk -F'"' '{print $4}')
 
 
             az account set \
-            --subscription $SUBSCRIPTION_ID
+            --subscription $(grep subscriptionId azure.json | awk -F'"' '{print $4}')
 
 
             '''
