@@ -7,14 +7,15 @@ pipeline {
 
         AZURE_WEBAPP_NAME = "darshak-nodejs-mongo-web"
         RESOURCE_GROUP = "rg-nodejs-mongo-dev"
-        ARTIFACT = "app-${BUILD_NUMBER}.zip"
 
     }
 
 
     options {
+
         timestamps()
         disableConcurrentBuilds()
+
     }
 
 
@@ -25,86 +26,167 @@ pipeline {
 
             steps {
 
+                echo "Downloading artifact from CI pipeline..."
+
                 copyArtifacts(
                     projectName: 'nodejs-mongodb-ci',
                     selector: lastSuccessful()
                 )
 
             }
+
         }
 
 
-       stage('Azure Login') {
 
-    steps {
+        stage('Azure Login') {
 
-        withCredentials([
-            string(credentialsId: 'azure-client-id', variable: 'AZURE_CLIENT_ID'),
-            string(credentialsId: 'azure-client-secret', variable: 'AZURE_CLIENT_SECRET'),
-            string(credentialsId: 'azure-tenant-id', variable: 'AZURE_TENANT_ID')
-        ]) {
+            steps {
 
-            sh '''
-            
-            az login \
-            --service-principal \
-            --username "$AZURE_CLIENT_ID" \
-            --password "$AZURE_CLIENT_SECRET" \
-            --tenant "$AZURE_TENANT_ID"
+                withCredentials([
 
-            az account show
+                    string(
+                        credentialsId: 'azure-client-id',
+                        variable: 'AZURE_CLIENT_ID'
+                    ),
 
-            '''
+                    string(
+                        credentialsId: 'azure-client-secret',
+                        variable: 'AZURE_CLIENT_SECRET'
+                    ),
+
+                    string(
+                        credentialsId: 'azure-tenant-id',
+                        variable: 'AZURE_TENANT_ID'
+                    )
+
+                ]) {
+
+
+                    sh '''
+
+                    echo "Logging into Azure..."
+
+                    az login \
+                    --service-principal \
+                    --username "$AZURE_CLIENT_ID" \
+                    --password "$AZURE_CLIENT_SECRET" \
+                    --tenant "$AZURE_TENANT_ID"
+
+
+                    echo "Azure Account"
+
+                    az account show
+
+                    '''
+
+                }
+
+            }
+
         }
-    }
-}
 
 
 
-        stage('Deploy to Azure App Service') {
-    steps {
-        sh '''
-        echo "Finding artifact..."
 
-        ARTIFACT=$(ls *.tar.gz | head -1)
-
-        echo "Found artifact: $ARTIFACT"
-
-
-        echo "Extracting artifact..."
-
-        tar -xzf $ARTIFACT
-
-
-        echo "Creating deployment zip..."
-
-        zip -r deploy.zip . \
-        -x ".git/*" \
-        "jenkins/*"
-
-
-        echo "Deploying to Azure..."
-
-        az webapp deploy \
-        --resource-group rg-nodejs-mongo-dev \
-        --name darshak-nodejs-mongo-web \
-        --src-path deploy.zip \
-        --type zip
-        '''
-    }
-}
-
-
-
-        stage('Restart App') {
+        stage('Prepare Deployment Package') {
 
             steps {
 
                 sh '''
 
+                echo "Finding CI artifact..."
+
+                ARTIFACT=$(ls *.tar.gz | head -1)
+
+
+                if [ -z "$ARTIFACT" ]; then
+
+                    echo "No artifact found"
+                    exit 1
+
+                fi
+
+
+                echo "Using artifact: $ARTIFACT"
+
+
+
+                echo "Extracting artifact..."
+
+                tar -xzf $ARTIFACT
+
+
+
+                echo "Creating Azure deployment package..."
+
+                rm -f deploy.zip
+
+
+
+                zip -r deploy.zip . \
+                -x ".git/*" \
+                "jenkins/*" \
+                "*.tar.gz" \
+                "*.zip"
+
+
+
+                echo "Deployment package created"
+
+                ls -lh deploy.zip
+
+
+                '''
+
+            }
+
+        }
+
+
+
+
+        stage('Deploy to Azure App Service') {
+
+            steps {
+
+                sh '''
+
+                echo "Deploying application to Azure App Service..."
+
+                az webapp deploy \
+                --resource-group ${RESOURCE_GROUP} \
+                --name ${AZURE_WEBAPP_NAME} \
+                --src-path deploy.zip \
+                --type zip
+
+
+
+                echo "Deployment command completed"
+
+                '''
+
+            }
+
+        }
+
+
+
+
+        stage('Restart App Service') {
+
+            steps {
+
+                sh '''
+
+                echo "Restarting App Service..."
+
+
                 az webapp restart \
                 --resource-group ${RESOURCE_GROUP} \
                 --name ${AZURE_WEBAPP_NAME}
+
+
 
                 '''
 
@@ -116,39 +198,85 @@ pipeline {
 
 
         stage('Health Check') {
-    steps {
-        sh '''
-        sleep 60
-        
-        APP_URL=$(az webapp show \
-        --resource-group rg-nodejs-mongo-dev \
-        --name darshak-nodejs-mongo-web \
-        --query defaultHostName \
-        -o tsv)
 
-        echo "Checking application: https://$APP_URL"
+            steps {
 
-        curl -I https://$APP_URL
-        '''
+                sh '''
+
+                echo "Waiting for application startup..."
+
+                sleep 60
+
+
+
+                APP_URL=$(az webapp show \
+                --resource-group ${RESOURCE_GROUP} \
+                --name ${AZURE_WEBAPP_NAME} \
+                --query defaultHostName \
+                -o tsv)
+
+
+
+                echo "Application URL:"
+                echo "https://${APP_URL}"
+
+
+
+                echo "Checking application health..."
+
+                HTTP_STATUS=$(curl -o /dev/null -s -w "%{http_code}" https://${APP_URL})
+
+
+
+                echo "HTTP Status: ${HTTP_STATUS}"
+
+
+
+                if [ "$HTTP_STATUS" -eq 200 ]; then
+
+                    echo "Application is healthy"
+
+                else
+
+                    echo "Application health check failed"
+
+                    exit 1
+
+                fi
+
+
+                '''
+
+            }
+
+        }
+
+
     }
-}
 
 
 
     post {
 
+
         success {
 
-            echo "Deployment completed successfully"
+            echo "================================="
+            echo "Deployment Successful"
+            echo "================================="
 
         }
+
 
 
         failure {
 
-            echo "Deployment failed"
+            echo "================================="
+            echo "Deployment Failed"
+            echo "================================="
 
         }
+
 
     }
 
