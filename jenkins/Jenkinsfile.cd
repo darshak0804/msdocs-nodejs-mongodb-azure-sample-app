@@ -116,26 +116,22 @@ pipeline {
 
 
         stage('Health Check') {
+    steps {
+        sh '''
+        sleep 60
+        
+        APP_URL=$(az webapp show \
+        --resource-group rg-nodejs-mongo-dev \
+        --name darshak-nodejs-mongo-web \
+        --query defaultHostName \
+        -o tsv)
 
-            steps {
+        echo "Checking application: https://$APP_URL"
 
-                sh '''
-
-                sleep 30
-
-
-                curl -I \
-                https://${AZURE_WEBAPP_NAME}.azurewebsites.net
-
-
-                '''
-
-            }
-
-        }
-
-
+        curl -I https://$APP_URL
+        '''
     }
+}
 
 
 
