@@ -77,6 +77,8 @@ pipeline {
         stage('Publish artifact') {
             steps {
                 archiveArtifacts artifacts: "${ARTIFACT}", fingerprint: true
+                stash name: 'deploy-package',
+      i         ncludes: "${ARTIFACT}"
                 // Optional: also push to a shared location (Azure Blob
                 // Storage) so the CD job doesn't depend on Jenkins' own
                 // artifact store. Requires the Azure CLI on the agent and
