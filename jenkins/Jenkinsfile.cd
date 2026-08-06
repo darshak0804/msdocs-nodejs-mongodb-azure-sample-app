@@ -27,7 +27,7 @@ pipeline {
 
                 copyArtifacts(
                     projectName: 'nodejs-mongodb-ci',
-                    selector: specific("${BUILD_NUMBER}")
+                    sselector: lastSuccessful()
                 )
 
             }
