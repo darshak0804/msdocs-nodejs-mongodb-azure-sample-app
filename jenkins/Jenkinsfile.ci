@@ -55,15 +55,17 @@ pipeline {
         }
 
         stage('Package') {
-            steps {
-                sh '''
-                    rm -rf dist "${ARTIFACT}"
-                    mkdir dist
-                    rsync -a --exclude 'dist' --exclude '.git' --exclude 'node_modules/.cache' ./ dist/
-                    cd dist && zip -r "../${ARTIFACT}" . -x "*.git*"
-                '''
-            }
-        }
+    steps {
+        sh '''
+            rm -rf dist "${ARTIFACT}"
+            mkdir dist
+            cp -r . dist/
+            cd dist
+            rm -rf .git node_modules
+            zip -r "../${ARTIFACT}" .
+        '''
+    }
+}
 
         stage('Publish artifact') {
             steps {
